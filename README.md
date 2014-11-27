@@ -66,7 +66,7 @@ import (
 
 func main() {
     results := make(chan *bonjour.ServiceEntry)
-    resolver, err := bonjour.NewResolver(nil)
+    resolver, err := bonjour.NewResolver(nil, results)
     if err != nil {
         log.Println("Failed to initialize resolver:", err.Error())
         os.Exit(1)
