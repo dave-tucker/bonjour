@@ -198,11 +198,15 @@ func newServer(iface *net.Interface) (*server, error) {
 	p1 := ipv4.NewPacketConn(ipv4conn)
 	p2 := ipv6.NewPacketConn(ipv6conn)
 	if iface != nil {
+		errCount := 0
 		if err := p1.JoinGroup(iface, &net.UDPAddr{IP: mdnsGroupIPv4}); err != nil {
-			return nil, err
+			errCount++
 		}
 		if err := p2.JoinGroup(iface, &net.UDPAddr{IP: mdnsGroupIPv6}); err != nil {
-			return nil, err
+			errCount++
+		}
+		if errCount == 2 {
+			return nil, fmt.Errorf("Failed to join multicast group on both v4 and v6")
 		}
 	} else {
 		ifaces, err := net.Interfaces()
