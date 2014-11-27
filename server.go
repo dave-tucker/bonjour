@@ -90,14 +90,15 @@ func Register(instance, service, domain string, port int, text []string, iface *
 		}
 	} else {
 		addrs, err := iface.Addrs()
-		if err != nil {
+		if err == nil {
 			for i := 0; i < len(addrs); i++ {
 				addr := addrs[i].String()
+				addr = strings.Split(addr, "/")[0]
 				ip := net.ParseIP(addr)
 				if ip != nil {
-					if len(ip) == 4 {
+					if ip.To4() != nil {
 						entry.AddrIPv4 = ip
-					} else if len(ip) == 16 {
+					} else if ip.To16() != nil {
 						entry.AddrIPv6 = ip
 					}
 				}
