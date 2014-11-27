@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/miekg/dns"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"github.com/miekg/dns"
 )
 
 // Main client data structure to run browse/lookup queries
@@ -19,23 +19,22 @@ type Resolver struct {
 }
 
 // Resolver structure constructor
-func NewResolver(iface *net.Interface) (*Resolver, error) {
-	c, err := newClient(iface)
+func NewResolver(iface *net.Interface, serviceChan chan<- *ServiceEntry) (*Resolver, error) {
+	c, err := newClient(iface, serviceChan)
 	if err != nil {
 		return nil, err
 	}
+	go c.mainloop()
 	return &Resolver{c, c.closedCh}, nil
 }
 
 // Browse for all services of a fiven type in a given domain
-func (r *Resolver) Browse(service, domain string, entries chan<- *ServiceEntry) error {
+func (r *Resolver) Browse(service, domain string) error {
 	params := defaultParams(service)
 	if domain != "" {
 		params.Domain = domain
 	}
-	params.Entries = entries
-
-	go r.c.mainloop(params)
+	r.c.addLookupParams(params)
 
 	err := r.c.query(params)
 	if err != nil {
@@ -47,15 +46,13 @@ func (r *Resolver) Browse(service, domain string, entries chan<- *ServiceEntry) 
 }
 
 // Look up a specific service by its name and type in a given domain
-func (r *Resolver) Lookup(instance, service, domain string, entries chan<- *ServiceEntry) error {
+func (r *Resolver) Lookup(instance, service, domain string) error {
 	params := defaultParams(service)
 	params.Instance = instance
 	if domain != "" {
 		params.Domain = domain
 	}
-	params.Entries = entries
-
-	go r.c.mainloop(params)
+	r.c.addLookupParams(params)
 
 	err := r.c.query(params)
 	if err != nil {
@@ -71,17 +68,40 @@ func defaultParams(service string) *LookupParams {
 	return NewLookupParams("", service, "local", make(chan *ServiceEntry))
 }
 
+func (c *client) addLookupParams(params *LookupParams) {
+	if params.ServiceInstanceName() != "" {
+		c.lookupParams[params.ServiceInstanceName()] = params
+	} else {
+		c.lookupParams[params.ServiceName()] = params
+	}
+}
+
+func (c *client) getLookupParams(serviceName string) *LookupParams {
+	return c.lookupParams[serviceName]
+}
+
+func (c *client) getMatchingParamsSuffix(serviceName string) (*LookupParams, bool) {
+	for key, val := range c.lookupParams {
+		if strings.HasSuffix(serviceName, key) {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
 // Client structure incapsulates both IPv4/IPv6 UDP connections
 type client struct {
-	ipv4conn  *net.UDPConn
-	ipv6conn  *net.UDPConn
-	closed    bool
-	closedCh  chan bool
-	closeLock sync.Mutex
+	lookupParams map[string]*LookupParams
+	serviceChan  chan<- *ServiceEntry
+	ipv4conn     *net.UDPConn
+	ipv6conn     *net.UDPConn
+	closed       bool
+	closedCh     chan bool
+	closeLock    sync.Mutex
 }
 
 // Client structure constructor
-func newClient(iface *net.Interface) (*client, error) {
+func newClient(iface *net.Interface, serviceChan chan<- *ServiceEntry) (*client, error) {
 	// Create wildcard connections (because :5353 can be already taken by other apps)
 	ipv4conn, err := net.ListenUDP("udp4", mdnsWildcardAddrIPv4)
 	if err != nil {
@@ -125,16 +145,18 @@ func newClient(iface *net.Interface) (*client, error) {
 	}
 
 	c := &client{
-		ipv4conn: ipv4conn,
-		ipv6conn: ipv6conn,
-		closedCh: make(chan bool),
+		lookupParams: make(map[string]*LookupParams),
+		serviceChan:  serviceChan,
+		ipv4conn:     ipv4conn,
+		ipv6conn:     ipv6conn,
+		closedCh:     make(chan bool),
 	}
 
 	return c, nil
 }
 
 // Start listeners and waits for the shutdown signal from exit channel
-func (c *client) mainloop(params *LookupParams) {
+func (c *client) mainloop() {
 	// start listening for responses
 	msgCh := make(chan *dns.Msg, 32)
 	if c.ipv4conn != nil {
@@ -158,10 +180,8 @@ func (c *client) mainloop(params *LookupParams) {
 			for _, answer := range sections {
 				switch rr := answer.(type) {
 				case *dns.PTR:
-					if params.ServiceName() != rr.Hdr.Name {
-						continue
-					}
-					if params.ServiceInstanceName() != "" && params.ServiceInstanceName() != rr.Ptr {
+					params := c.getLookupParams(rr.Hdr.Name)
+					if params == nil {
 						continue
 					}
 					if _, ok := entries[rr.Ptr]; !ok {
@@ -172,10 +192,13 @@ func (c *client) mainloop(params *LookupParams) {
 					}
 					entries[rr.Ptr].TTL = rr.Hdr.Ttl
 				case *dns.SRV:
-					if params.ServiceInstanceName() != "" && params.ServiceInstanceName() != rr.Hdr.Name {
-						continue
-					} else if !strings.HasSuffix(rr.Hdr.Name, params.ServiceName()) {
-						continue
+					params := c.getLookupParams(rr.Hdr.Name)
+					if params == nil {
+						var ok bool
+						params, ok = c.getMatchingParamsSuffix(rr.Hdr.Name)
+						if !ok {
+							continue
+						}
 					}
 					if _, ok := entries[rr.Hdr.Name]; !ok {
 						entries[rr.Hdr.Name] = NewServiceEntry(
@@ -187,10 +210,13 @@ func (c *client) mainloop(params *LookupParams) {
 					entries[rr.Hdr.Name].Port = int(rr.Port)
 					entries[rr.Hdr.Name].TTL = rr.Hdr.Ttl
 				case *dns.TXT:
-					if params.ServiceInstanceName() != "" && params.ServiceInstanceName() != rr.Hdr.Name {
-						continue
-					} else if !strings.HasSuffix(rr.Hdr.Name, params.ServiceName()) {
-						continue
+					params := c.getLookupParams(rr.Hdr.Name)
+					if params == nil {
+						var ok bool
+						params, ok = c.getMatchingParamsSuffix(rr.Hdr.Name)
+						if !ok {
+							continue
+						}
 					}
 					if _, ok := entries[rr.Hdr.Name]; !ok {
 						entries[rr.Hdr.Name] = NewServiceEntry(
@@ -223,11 +249,7 @@ func (c *client) mainloop(params *LookupParams) {
 					delete(sentEntries, k)
 					continue
 				}
-				if _, ok := sentEntries[k]; ok {
-					continue
-				}
-				params.Entries <- e
-				sentEntries[k] = e
+				c.serviceChan <- e
 			}
 			// reset entries
 			entries = make(map[string]*ServiceEntry)
