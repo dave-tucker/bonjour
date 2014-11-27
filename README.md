@@ -24,13 +24,12 @@ import (
 )
 
 func main() {
-    resolver, err := bonjour.NewResolver(nil)
+    results := make(chan *bonjour.ServiceEntry)
+    resolver, err := bonjour.NewResolver(nil, results)
     if err != nil {
         log.Println("Failed to initialize resolver:", err.Error())
         os.Exit(1)
     }
-
-    results := make(chan *bonjour.ServiceEntry)
 
     go func(results chan *bonjour.ServiceEntry, exitCh chan<- bool) {
         for e := range results {
@@ -41,7 +40,7 @@ func main() {
         }
     }(results, resolver.Exit)
 
-    err = resolver.Browse("_foobar._tcp", "local.", results)
+    err = resolver.Browse("_foobar._tcp", "local.")
     if err != nil {
         log.Println("Failed to browse:", err.Error())
     }
@@ -66,13 +65,12 @@ import (
 )
 
 func main() {
+    results := make(chan *bonjour.ServiceEntry)
     resolver, err := bonjour.NewResolver(nil)
     if err != nil {
         log.Println("Failed to initialize resolver:", err.Error())
         os.Exit(1)
     }
-
-    results := make(chan *bonjour.ServiceEntry)
 
     go func(results chan *bonjour.ServiceEntry, exitCh chan<- bool) {
         for e := range results {
@@ -83,7 +81,7 @@ func main() {
         }
     }(results, resolver.Exit)
 
-    err = resolver.Lookup("DEMO", "_foobar._tcp", "", results)
+    err = resolver.Lookup("DEMO", "_foobar._tcp", "")
     if err != nil {
         log.Println("Failed to browse:", err.Error())
     }
