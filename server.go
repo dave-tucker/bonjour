@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/miekg/dns"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"github.com/miekg/dns"
 )
 
 var (
@@ -70,21 +70,38 @@ func Register(instance, service, domain string, port int, text []string, iface *
 	}
 	entry.HostName = fmt.Sprintf("%s.", trimDot(entry.HostName))
 
-	addrs, err := net.LookupIP(entry.HostName)
-	if err != nil {
-		// Try appending the host domain suffix and lookup again
-		// (required for Linux-based hosts)
-		tmpHostName := fmt.Sprintf("%s%s.", entry.HostName, entry.Domain)
-		addrs, err = net.LookupIP(tmpHostName)
+	if iface == nil {
+		addrs, err := net.LookupIP(entry.HostName)
 		if err != nil {
-			return nil, fmt.Errorf("Could not determine host IP addresses for %s", entry.HostName)
+			// Try appending the host domain suffix and lookup again
+			// (required for Linux-based hosts)
+			tmpHostName := fmt.Sprintf("%s%s.", entry.HostName, entry.Domain)
+			addrs, err = net.LookupIP(tmpHostName)
+			if err != nil {
+				return nil, fmt.Errorf("Could not determine host IP addresses for %s", entry.HostName)
+			}
 		}
-	}
-	for i := 0; i < len(addrs); i++ {
-		if ipv4 := addrs[i].To4(); ipv4 != nil {
-			entry.AddrIPv4 = addrs[i]
-		} else if ipv6 := addrs[i].To16(); ipv6 != nil {
-			entry.AddrIPv6 = addrs[i]
+		for i := 0; i < len(addrs); i++ {
+			if ipv4 := addrs[i].To4(); ipv4 != nil {
+				entry.AddrIPv4 = addrs[i]
+			} else if ipv6 := addrs[i].To16(); ipv6 != nil {
+				entry.AddrIPv6 = addrs[i]
+			}
+		}
+	} else {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			for i := 0; i < len(addrs); i++ {
+				addr := addrs[i].String()
+				ip := net.ParseIP(addr)
+				if ip != nil {
+					if len(ip) == 4 {
+						entry.AddrIPv4 = ip
+					} else if len(ip) == 16 {
+						entry.AddrIPv6 = ip
+					}
+				}
+			}
 		}
 	}
 
