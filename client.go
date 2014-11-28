@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/miekg/dns"
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
+	"github.com/socketplane/bonjour/Godeps/_workspace/src/github.com/miekg/dns"
+	"github.com/socketplane/bonjour/Godeps/_workspace/src/golang.org/x/net/ipv4"
+	"github.com/socketplane/bonjour/Godeps/_workspace/src/golang.org/x/net/ipv6"
 )
 
 // Main client data structure to run browse/lookup queries
