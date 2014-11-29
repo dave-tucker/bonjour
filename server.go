@@ -87,7 +87,6 @@ func Register(instance, service, domain string, port int, text []string, iface *
 						addrs = append(addrs, ipnet.IP)
 					}
 				}
-				fmt.Println(addrs)
 				if len(addrs) == 0 {
 					return nil, fmt.Errorf("Could not determine host IP addresses for %s", entry.HostName)
 				}
