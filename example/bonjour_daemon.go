@@ -21,6 +21,7 @@ func main() {
 		ServiceDomain:   DOCKER_CLUSTER_DOMAIN,
 		ServicePort:     9999,
 		InterfaceName:   intfName,
+		BindToIntf:      true,
 		OnMemberHello:   newMember,
 		OnMemberGoodBye: removeMember,
 	}

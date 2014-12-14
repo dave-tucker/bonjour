@@ -12,6 +12,7 @@ type Bonjour struct {
 	ServiceDomain   string
 	ServicePort     int
 	InterfaceName   string
+	BindToIntf      bool
 	OnMemberHello   func(net.IP)
 	OnMemberGoodBye func(net.IP)
 }
@@ -39,7 +40,7 @@ func (b Bonjour) publish() {
 		instance, err := os.Hostname()
 		_, err = Register(instance, b.ServiceName,
 			b.ServiceDomain, b.ServicePort,
-			[]string{"txtv=1", "key1=val1", "key2=val2"}, iface)
+			[]string{"txtv=1", "key1=val1", "key2=val2"}, iface, b.BindToIntf)
 		if err != nil {
 			log.Fatalln(err.Error())
 		}
