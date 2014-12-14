@@ -7,14 +7,18 @@ import (
 	"time"
 )
 
+type BonjourNotify interface {
+	NewMember(net.IP)
+	RemoveMember(net.IP)
+}
+
 type Bonjour struct {
-	ServiceName     string
-	ServiceDomain   string
-	ServicePort     int
-	InterfaceName   string
-	BindToIntf      bool
-	OnMemberHello   func(net.IP)
-	OnMemberGoodBye func(net.IP)
+	ServiceName   string
+	ServiceDomain string
+	ServicePort   int
+	InterfaceName string
+	BindToIntf    bool
+	Notify        BonjourNotify
 }
 
 type cacheEntry struct {
@@ -73,15 +77,15 @@ func (b Bonjour) resolve(resolver *Resolver, results chan *ServiceEntry) {
 				if _, ok := dnsCache[e.AddrIPv4.String()]; !ok {
 					log.Printf("New Bonjour Member : %s, %s, %s, %s",
 						e.Instance, e.Service, e.Domain, e.AddrIPv4)
-					if b.OnMemberHello != nil {
-						b.OnMemberHello(e.AddrIPv4)
+					if b.Notify != nil {
+						b.Notify.NewMember(e.AddrIPv4)
 					}
 				}
 				dnsCache[e.AddrIPv4.String()] = cacheEntry{e, time.Now()}
 			} else {
 				log.Printf("Bonjour Member Gone : %s, %s, %s, %s", e.Instance, e.Service, e.Domain, e.AddrIPv4)
-				if b.OnMemberGoodBye != nil {
-					b.OnMemberGoodBye(e.AddrIPv4)
+				if b.Notify != nil {
+					b.Notify.RemoveMember(e.AddrIPv4)
 				}
 				delete(dnsCache, e.AddrIPv4.String())
 			}
@@ -107,8 +111,8 @@ func (b Bonjour) keepAlive(resolver *Resolver) {
 	for {
 		for key, e := range dnsCache {
 			if time.Now().Sub(e.lastSeen) > sleeper*2 {
-				if b.OnMemberGoodBye != nil {
-					b.OnMemberGoodBye(net.ParseIP(key))
+				if b.Notify != nil {
+					b.Notify.NewMember(net.ParseIP(key))
 				}
 				delete(dnsCache, key)
 				log.Println("Bonjour Member timed out : ", key)
