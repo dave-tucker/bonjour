@@ -38,7 +38,7 @@ func (b Bonjour) publish() {
 		if ifName != "" {
 			iface, err = net.InterfaceByName(ifName)
 			if err != nil {
-				log.Fatalln(err.Error())
+				log.Println(err.Error())
 			}
 		}
 		instance, err := os.Hostname()
@@ -46,7 +46,7 @@ func (b Bonjour) publish() {
 			b.ServiceDomain, b.ServicePort,
 			[]string{"txtv=1", "key1=val1", "key2=val2"}, iface, b.BindToIntf)
 		if err != nil {
-			log.Fatalln(err.Error())
+			log.Println(err.Error())
 		}
 		time.Sleep(sleeper)
 	}
