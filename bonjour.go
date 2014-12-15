@@ -106,13 +106,39 @@ func isMyAddress(address string) bool {
 	return false
 }
 
+func InterfaceToBind() *net.Interface {
+	var iface *net.Interface = nil
+	ifaces, err := net.Interfaces()
+	if err == nil {
+	BindIntf:
+		for _, bIntf := range ifaces {
+			addrs, err := bIntf.Addrs()
+			if err != nil {
+				continue
+			}
+			for i := 0; i < len(addrs); i++ {
+				ip, _, err := net.ParseCIDR(addrs[i].String())
+				if err == nil && ip.To4() != nil {
+					ret, err := echo("224.0.0.1", &ip)
+					if err == nil && ret == ECHO_REPLY {
+						iface = &bIntf
+						break BindIntf
+					}
+				}
+				// TODO : Handle IPv6
+			}
+		}
+	}
+	return iface
+}
+
 func (b Bonjour) keepAlive(resolver *Resolver) {
 	sleeper := time.Second * 30
 	for {
 		for key, e := range dnsCache {
 			if time.Now().Sub(e.lastSeen) > sleeper*2 {
 				if b.Notify != nil {
-					b.Notify.NewMember(net.ParseIP(key))
+					b.Notify.RemoveMember(net.ParseIP(key))
 				}
 				delete(dnsCache, key)
 				log.Println("Bonjour Member timed out : ", key)

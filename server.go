@@ -72,27 +72,7 @@ func Register(instance, service, domain string, port int, text []string, iface *
 	entry.HostName = fmt.Sprintf("%s.", trimDot(entry.HostName))
 
 	if iface == nil && bindToIntf {
-		ifaces, err := net.Interfaces()
-		if err == nil {
-		BindIntf:
-			for _, bIntf := range ifaces {
-				addrs, err := bIntf.Addrs()
-				if err != nil {
-					continue
-				}
-				for i := 0; i < len(addrs) && iface == nil; i++ {
-					ip, _, err := net.ParseCIDR(addrs[i].String())
-					if err == nil && ip.To4() != nil {
-						ret, err := echo("224.0.0.1", &ip)
-						if err == nil && ret == ECHO_REPLY {
-							iface = &bIntf
-							break BindIntf
-						}
-					}
-					// TODO : Handle IPv6
-				}
-			}
-		}
+		iface = InterfaceToBind()
 	}
 
 	if iface == nil {
