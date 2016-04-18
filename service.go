@@ -15,6 +15,7 @@ type ServiceRecord struct {
 	// private variable populated on the first call to serviceName()/serviceInstanceName()
 	serviceName         string
 	serviceInstanceName string
+	serviceTypeName     string
 }
 
 // ServiceName returns complete service name (e.g. _foobar._tcp.local.), which is composed
@@ -41,9 +42,22 @@ func (s *ServiceRecord) ServiceInstanceName() string {
 	return s.serviceInstanceName
 }
 
+// ServiceTypeName returns the complete service type name
+func (s *ServiceRecord) ServiceTypeName() string {
+	// If not cached - compose and cache
+	if s.serviceTypeName == "" {
+		domain := "local"
+		if len(s.Domain) > 0 {
+			domain = trimDot(s.Domain)
+		}
+		s.serviceTypeName = fmt.Sprintf("_services._dns-sd._udp.%s.", domain)
+	}
+	return s.serviceTypeName
+}
+
 // NewServiceRecord constructs a ServiceRecord structure by given arguments
 func NewServiceRecord(instance, service, domain string) *ServiceRecord {
-	return &ServiceRecord{instance, service, domain, "", ""}
+	return &ServiceRecord{instance, service, domain, "", "", ""}
 }
 
 // LookupParams contains configurable properties to create a service discovery request
