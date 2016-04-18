@@ -1,0 +1,11 @@
+machine:
+  services: 
+    - docker
+
+dependencies:
+  override:
+    - echo "Nothing to do"
+
+test:
+  override: 
+    - make test
