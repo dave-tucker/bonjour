@@ -16,9 +16,12 @@ type response struct {
 }
 
 const (
-	ECHO_REPLY = iota
-	NO_REPLY
-	ERROR
+	// EchoReply indicates that a reply was received
+	EchoReply = iota
+	// NoReply indicates that no reply was received
+	NoReply
+	// Error indicates that there was an error with the request
+	Error
 )
 
 func echo(address string, ip *net.IP) (int, error) {
@@ -30,7 +33,7 @@ func echo(address string, ip *net.IP) (int, error) {
 	}
 	ra, err := net.ResolveIPAddr(netProto, address)
 	if err != nil {
-		return ERROR, err
+		return Error, err
 	}
 
 	if ip != nil && ip.To4() != nil {
@@ -57,16 +60,16 @@ func echo(address string, ip *net.IP) (int, error) {
 	p.MaxRTT = time.Second
 	go p.Run()
 
-	ret := NO_REPLY
+	ret := NoReply
 	select {
 	case <-onRecv:
-		ret = ECHO_REPLY
+		ret = EchoReply
 	case <-onIdle:
-		ret = NO_REPLY
+		ret = NoReply
 	case res := <-onErr:
-		errId := fmt.Sprintf("%d", res)
-		err = errors.New(errId)
-		ret = ERROR
+		errID := fmt.Sprintf("%d", res)
+		err = errors.New(errID)
+		ret = Error
 	}
 
 	p.Stop()

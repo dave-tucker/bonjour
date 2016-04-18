@@ -145,8 +145,8 @@ func Register(instance, service, domain string, port int, text []string, iface *
 	return s.shutdownCh, nil
 }
 
-// Register a service proxy by given argument. This call will skip the hostname/IP lookup and
-// will use the provided values.
+// RegisterProxy registers a service proxy by given argument.
+// This call will skip the hostname/IP lookup and will use the provided values.
 func RegisterProxy(instance, service, domain string, port int, host, ip string, text []string, iface *net.Interface) (chan<- bool, error) {
 	entry := NewServiceEntry(instance, service, domain)
 	entry.Port = port
@@ -215,7 +215,7 @@ func newServer(iface *net.Interface) (*server, error) {
 	}
 	ipv6conn, err := net.ListenMulticastUDP("udp6", iface, mdnsWildcardAddrIPv6)
 	if ipv4conn == nil && ipv6conn == nil {
-		return nil, fmt.Errorf("[ERR] bonjour: Failed to bind to any udp port!")
+		return nil, fmt.Errorf("[ERR] bonjour: Failed to bind to any udp port")
 	}
 
 	// Join multicast groups to receive announcements
@@ -342,7 +342,7 @@ func (s *server) handleQuery(query *dns.Msg, from net.Addr) error {
 		err  error
 	)
 	if len(query.Question) > 0 {
-		for i, _ := range query.Question {
+		for i := range query.Question {
 			resp = dns.Msg{}
 			resp.SetReply(query)
 			resp.Answer = []dns.RR{}
@@ -511,6 +511,28 @@ func (s *server) composeLookupAnswers(resp *dns.Msg, ttl uint32) {
 		}
 		resp.Extra = append(resp.Extra, aaaa)
 	}
+	/*
+	    	// RFC 6762 - Negative Responses
+
+	   	if s.service.AddrIPv4 == nil {
+	   		nsec := &dns.NSEC{
+	   			Hdr: dns.RR_Header{
+	   				Name: s.service.ServiceInstanceName(),
+	   				RrType: dns.TypeNSEC,
+	   				Class: dns.ClassINET,
+	   				TtlL ttl,
+	   			},
+	   			NextDomain: s.service.ServiceInstanceName(),
+
+	   		}
+	   		resp.Extra = append(resp.Extra, nsec)
+	   	}
+
+	   	if s.service.AddrIPv6 == nil {
+	   		nsec := &dns.NSEC{}
+	   		resp.Extra = append(resp.Extra, nsec)
+	   	}
+	*/
 }
 
 // Perform probing & announcement
@@ -580,25 +602,24 @@ func (s *server) sendResponse(resp *dns.Msg, from net.Addr) error {
 	addr := from.(*net.UDPAddr)
 	if addr.IP.To4() != nil {
 		_, err = s.ipv4conn.WriteToUDP(buf, addr)
-		return err
 	} else {
 		_, err = s.ipv6conn.WriteToUDP(buf, addr)
-		return err
 	}
+	return err
 }
 
 // multicastResponse us used to send a multicast response packet
-func (c *server) multicastResponse(msg *dns.Msg) error {
+func (s *server) multicastResponse(msg *dns.Msg) error {
 	buf, err := msg.Pack()
 	if err != nil {
 		log.Println("Failed to pack message!")
 		return err
 	}
-	if c.ipv4conn != nil {
-		c.ipv4conn.WriteTo(buf, ipv4Addr)
+	if s.ipv4conn != nil {
+		s.ipv4conn.WriteTo(buf, ipv4Addr)
 	}
-	if c.ipv6conn != nil {
-		c.ipv6conn.WriteTo(buf, ipv6Addr)
+	if s.ipv6conn != nil {
+		s.ipv6conn.WriteTo(buf, ipv6Addr)
 	}
 	return nil
 }
