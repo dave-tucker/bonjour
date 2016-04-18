@@ -8,8 +8,8 @@ import (
 	"github.com/socketplane/bonjour"
 )
 
-const DOCKER_CLUSTER_SERVICE = "_foobar._service"
-const DOCKER_CLUSTER_DOMAIN = "local"
+const dockerClusterService = "_foobar._service"
+const dockerClusterDomain = "local"
 
 func main() {
 	var intfName = ""
@@ -17,8 +17,8 @@ func main() {
 		intfName = os.Args[1]
 	}
 	b := bonjour.Bonjour{
-		ServiceName:   DOCKER_CLUSTER_SERVICE,
-		ServiceDomain: DOCKER_CLUSTER_DOMAIN,
+		ServiceName:   dockerClusterService,
+		ServiceDomain: dockerClusterDomain,
 		ServicePort:   9999,
 		InterfaceName: intfName,
 		BindToIntf:    true,

@@ -12,13 +12,13 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
-// Main client data structure to run browse/lookup queries
+// Resolver is the main client data structure to run browse/lookup queries
 type Resolver struct {
 	c    *client
 	Exit chan<- bool
 }
 
-// Resolver structure constructor
+// NewResolver returns a new Resolver
 func NewResolver(iface *net.Interface, serviceChan chan<- *ServiceEntry) (*Resolver, error) {
 	c, err := newClient(iface, serviceChan)
 	if err != nil {
@@ -45,7 +45,7 @@ func (r *Resolver) Browse(service, domain string) error {
 	return nil
 }
 
-// Look up a specific service by its name and type in a given domain
+// Lookup a specific service by its name and type in a given domain
 func (r *Resolver) Lookup(instance, service, domain string) error {
 	params := defaultParams(service)
 	params.Instance = instance
@@ -109,7 +109,7 @@ func newClient(iface *net.Interface, serviceChan chan<- *ServiceEntry) (*client,
 	}
 	ipv6conn, err := net.ListenUDP("udp6", mdnsWildcardAddrIPv6)
 	if ipv4conn == nil && ipv6conn == nil {
-		return nil, fmt.Errorf("[ERR] bonjour: Failed to bind to any udp port!")
+		return nil, fmt.Errorf("[ERR] bonjour: Failed to bind to any udp port")
 	}
 
 	// Join multicast groups to receive announcements from server
@@ -311,8 +311,8 @@ func (c *client) query(params *LookupParams) error {
 	m := new(dns.Msg)
 	if serviceInstanceName != "" {
 		m.Question = []dns.Question{
-			dns.Question{serviceInstanceName, dns.TypeSRV, dns.ClassINET},
-			dns.Question{serviceInstanceName, dns.TypeTXT, dns.ClassINET},
+			{serviceInstanceName, dns.TypeSRV, dns.ClassINET},
+			{serviceInstanceName, dns.TypeTXT, dns.ClassINET},
 		}
 		m.RecursionDesired = false
 	} else {
@@ -335,8 +335,8 @@ func (c *client) sendQuery(msg *dns.Msg) error {
 	if c.ipv4conn != nil {
 		c.ipv4conn.WriteTo(buf, ipv4Addr)
 	}
-	if c.ipv4conn != nil {
-		c.ipv4conn.WriteTo(buf, ipv6Addr)
+	if c.ipv6conn != nil {
+		c.ipv6conn.WriteTo(buf, ipv6Addr)
 	}
 	return nil
 }

@@ -1,4 +1,4 @@
-// bonjour
+// Package bonjour is an mDNS/DNS-SD (also know as Apple Bonjour) library for Go (in pure Go)
 //
 // This is a simple Multicast DNS-SD (Apple Bonjour) library written in Golang.
 // You can use it to discover services in the LAN. Pay attention to the

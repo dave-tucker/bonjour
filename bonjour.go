@@ -7,18 +7,20 @@ import (
 	"time"
 )
 
-type BonjourNotify interface {
+// Notify is used to notify watchers when a member has been added or removed
+type Notify interface {
 	NewMember(net.IP)
 	RemoveMember(net.IP)
 }
 
+// Bonjour is daemon that will advertise a given service and notify when others join or leave
 type Bonjour struct {
 	ServiceName   string
 	ServiceDomain string
 	ServicePort   int
 	InterfaceName string
 	BindToIntf    bool
-	Notify        BonjourNotify
+	Notify        Notify
 }
 
 type cacheEntry struct {
@@ -31,7 +33,7 @@ var queryChan chan *ServiceEntry
 
 func (b Bonjour) publishOnce() {
 	ifName := b.InterfaceName
-	var iface *net.Interface = nil
+	var iface *net.Interface
 	var err error
 	if ifName != "" {
 		iface, err = net.InterfaceByName(ifName)
@@ -111,6 +113,7 @@ func isMyAddress(address string) bool {
 	return false
 }
 
+// IsInterfaceEligible checks if an interface is eligible to bind to
 func IsInterfaceEligible(bIntf *net.Interface) bool {
 	if bIntf.Flags&net.FlagLoopback == 0 {
 		addrs, err := bIntf.Addrs()
@@ -121,7 +124,7 @@ func IsInterfaceEligible(bIntf *net.Interface) bool {
 			ip, _, err := net.ParseCIDR(addrs[i].String())
 			if err == nil && ip.To4() != nil {
 				ret, err := echo("224.0.0.1", &ip)
-				if err == nil && ret == ECHO_REPLY {
+				if err == nil && ret == EchoReply {
 					return true
 				}
 			}
@@ -131,8 +134,9 @@ func IsInterfaceEligible(bIntf *net.Interface) bool {
 	return false
 }
 
+// EligibleInterfacesToBind returns a list of interfaces that can be bound to
 func EligibleInterfacesToBind() []*net.Interface {
-	var eligibleIfaces []*net.Interface = []*net.Interface{}
+	var eligibleIfaces = []*net.Interface{}
 	ifaces, err := net.Interfaces()
 	if err == nil {
 		for _, bIntf := range ifaces {
@@ -144,6 +148,7 @@ func EligibleInterfacesToBind() []*net.Interface {
 	return eligibleIfaces
 }
 
+// InterfaceToBind returns the first interface that can be bound to
 func InterfaceToBind() *net.Interface {
 	ifaces, err := net.Interfaces()
 	if err == nil {
@@ -172,6 +177,7 @@ func (b Bonjour) keepAlive(resolver *Resolver) {
 	}
 }
 
+// Start will start the Bonjour daemon
 func (b Bonjour) Start() error {
 	dnsCache = make(map[string]cacheEntry)
 	queryChan = make(chan *ServiceEntry)
