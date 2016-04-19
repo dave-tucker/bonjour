@@ -507,6 +507,7 @@ func (s *Server) composeLookupAnswers(resp *dns.Msg, ttl uint32) {
 	}
 	resp.Answer = append(resp.Answer, srv, txt, ptr, dnssd)
 
+	var typeBitMap []uint16
 	if s.service.AddrIPv4 != nil {
 		a := &dns.A{
 			Hdr: dns.RR_Header{
@@ -518,6 +519,7 @@ func (s *Server) composeLookupAnswers(resp *dns.Msg, ttl uint32) {
 			A: s.service.AddrIPv4,
 		}
 		resp.Extra = append(resp.Extra, a)
+		typeBitMap = append(typeBitMap, dns.TypeA)
 	}
 	if s.service.AddrIPv6 != nil {
 		aaaa := &dns.AAAA{
@@ -530,29 +532,22 @@ func (s *Server) composeLookupAnswers(resp *dns.Msg, ttl uint32) {
 			AAAA: s.service.AddrIPv6,
 		}
 		resp.Extra = append(resp.Extra, aaaa)
+		typeBitMap = append(typeBitMap, dns.TypeAAAA)
 	}
-	/*
-	    	// RFC 6762 - Negative Responses
-
-	   	if s.service.AddrIPv4 == nil {
-	   		nsec := &dns.NSEC{
-	   			Hdr: dns.RR_Header{
-	   				Name: s.service.ServiceInstanceName(),
-	   				RrType: dns.TypeNSEC,
-	   				Class: dns.ClassINET,
-	   				TtlL ttl,
-	   			},
-	   			NextDomain: s.service.ServiceInstanceName(),
-
-	   		}
-	   		resp.Extra = append(resp.Extra, nsec)
-	   	}
-
-	   	if s.service.AddrIPv6 == nil {
-	   		nsec := &dns.NSEC{}
-	   		resp.Extra = append(resp.Extra, nsec)
-	   	}
-	*/
+	// RFC 6762 - Negative Responses
+	if len(typeBitMap) > 0 {
+		nsec := &dns.NSEC{
+			Hdr: dns.RR_Header{
+				Name:   s.service.HostName,
+				Rrtype: dns.TypeNSEC,
+				Class:  dns.ClassINET | cacheFlush,
+				Ttl:    120,
+			},
+			NextDomain: s.service.HostName,
+			TypeBitMap: typeBitMap,
+		}
+		resp.Extra = append(resp.Extra, nsec)
+	}
 }
 
 func (s *Server) serviceTypeName(resp *dns.Msg, ttl uint32) {
